@@ -9,7 +9,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 import tensorflow_hub as hub
-
+from PIL import Image
+import torch
 
 IMAGE_DIM = 224   # required/default image dimensionality
 
@@ -49,6 +50,35 @@ def load_images(image_paths, image_size, verbose=True):
     
     return np.asarray(loaded_images), loaded_image_paths
 
+
+def convert_pt_to_array(image_pt_list, image_size):
+    '''
+    Function for loading images into numpy arrays for passing to model.predict
+    inputs:
+        image_paths: list of image paths to load
+        image_size: size into which images should be resized
+        verbose: show all of the image path and sizes loaded
+
+    outputs:
+        loaded_images: loaded images on which keras model can run predictions
+        loaded_image_indexes: paths of images which the function is able to process
+
+    '''
+    loaded_images = []
+    loaded_image_paths = []
+
+    for image_pt in image_pt_list:
+        try:
+            i = 255. * image_pt.cpu().numpy()
+            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            img = img.resize(image_size, Image.NEAREST)
+            img = np.array(img, dtype=np.float32) / 255.
+            loaded_images.append(img)
+        except Exception as ex:
+            print("Image Load Failure: ", image_pt, ex)
+
+    return np.asarray(loaded_images)
+
 def load_model(model_path):
     if model_path is None or not exists(model_path):
     	raise ValueError("saved_model_path must be the valid directory of a saved model to load.")
@@ -63,9 +93,14 @@ def classify(model, input_paths, image_dim=IMAGE_DIM, predict_args={}):
     
     Optionally, pass predict_args that will be passed to tf.keras.Model.predict().
     """
-    images, image_paths = load_images(input_paths, (image_dim, image_dim))
-    probs = classify_nd(model, images, predict_args)
-    return dict(zip(image_paths, probs))
+    if isinstance(input_paths, torch.Tensor):
+        images = convert_pt_to_array(input_paths, (image_dim, image_dim))
+        probs = classify_nd(model, images, predict_args)
+        return probs
+    else:
+        images, image_paths = load_images(input_paths, (image_dim, image_dim))
+        probs = classify_nd(model, images, predict_args)
+        return dict(zip(image_paths, probs))
 
 
 def classify_nd(model, nd_images, predict_args={}):
