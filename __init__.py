@@ -40,7 +40,8 @@ class Safety_Checker:
         preds_list = predict.classify(NSFW_MODEL, images, image_dim=299)
         for preds in preds_list:
             highest_key = max(preds, key=preds.get)
-            if highest_key in ["hentai", "sexy", "porn"]:
+            # if highest_key in ["hentai", "sexy", "porn"]:
+            if highest_key in ["hentai", "porn"]:
                 nsfws.append(True)
             else:
                 nsfws.append(False)
